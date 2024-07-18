@@ -13,6 +13,7 @@ RUN apt-get update \
         unzip \
         wget \
         zip \
+        ssh \
     && rm -rf /var/lib/apt/lists/*
 
 USER runner
