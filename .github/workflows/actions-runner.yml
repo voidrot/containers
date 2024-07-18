@@ -2,6 +2,8 @@ name: Publish GitHub Actions Runner
 
 on:
   push:
+    paths:
+      - actions-runner/**
     branches:
       - main
   schedule:
