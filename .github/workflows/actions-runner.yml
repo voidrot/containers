@@ -11,13 +11,14 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: voidrot/actions-runner
 
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
+
 jobs:
   publish:
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -43,6 +44,7 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+          logout: false
       - name: Build and push
         id: push
         uses: docker/build-push-action@v5
