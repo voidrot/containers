@@ -19,4 +19,4 @@ RUN chown mcpo:mcpo /mcpo
 
 USER mcpo
 
-CMD ["/bin/bash"]
+CMD ["uvx", "mcpo", "--host", "0.0.0.0", "--port", "8000", "--config", "/mcpo/config.json", "--hot-reload"]

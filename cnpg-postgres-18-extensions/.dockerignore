@@ -1,0 +1,16 @@
+# Git context
+.git
+.github
+
+# Local build/test artifacts
+*.log
+*.tmp
+*.swp
+
+# Rust build output from local experiments
+target
+
+# OS/editor junk
+.DS_Store
+.idea
+.vscode

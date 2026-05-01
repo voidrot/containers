@@ -1,0 +1,99 @@
+name: Build CNPG Postgres 18 extension image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'cnpg-postgres-18-extensions/**'
+      - '.github/workflows/cnpg-postgres-18-extensions.yml'
+  pull_request:
+    paths:
+      - 'cnpg-postgres-18-extensions/**'
+      - '.github/workflows/cnpg-postgres-18-extensions.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * 1'
+
+concurrency:
+  group: cnpg-postgres-18-extensions-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/cnpg-postgres-18-extensions
+  PARADEDB_VERSION: v0.23.2
+  CARGO_PGRX_VERSION: 0.18.0
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=pg18
+            type=raw,value=${{ env.PARADEDB_VERSION }}
+            type=schedule,pattern={{date 'YYYYMMDD'}}
+            type=sha,prefix=git-
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.description=CloudNativePG PostgreSQL 18 image with pg_cron, pg_search, pg_partman, pgvector, pg_trgm, and hypopg
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./cnpg-postgres-18-extensions
+          file: ./cnpg-postgres-18-extensions/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          build-args: |
+            PARADEDB_VERSION=${{ env.PARADEDB_VERSION }}
+            CARGO_PGRX_VERSION=${{ env.CARGO_PGRX_VERSION }}
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test built image on amd64
+        run: |
+          set -euo pipefail
+          image_ref="${IMAGE_NAME}:pr-${GITHUB_SHA}"
+          docker build \
+            --file ./cnpg-postgres-18-extensions/Dockerfile \
+            --tag "${image_ref}" \
+            --build-arg PARADEDB_VERSION=${PARADEDB_VERSION} \
+            --build-arg CARGO_PGRX_VERSION=${CARGO_PGRX_VERSION} \
+            ./cnpg-postgres-18-extensions
+          docker run --rm "${image_ref}" bash -lc '
+            test -f /usr/lib/postgresql/18/lib/pg_cron.so
+            test -f /usr/lib/postgresql/18/lib/hypopg.so
+            test -f /usr/lib/postgresql/18/lib/pg_partman_bgw.so
+            test -f /usr/lib/postgresql/18/lib/vector.so
+            test -f /usr/lib/postgresql/18/lib/pg_search.so
+            test -f /usr/share/postgresql/18/extension/pg_trgm.control
+          '
